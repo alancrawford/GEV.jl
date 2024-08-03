@@ -48,14 +48,15 @@ export clogit, clogit_model, clogit_param, clogit_case,
 	   TS1, TS2, new_clogit_data, getCW, maxJ, getInsideGoods,
 	   DemandOutputs_clogit_case, AggregateDemand, 
 	   getX, getP, getQty, getShares, getdQdP,
-	   getDiversionRatioMatrix, getElasticityMatrix, 
+	   getDiversionRatioMatrix, getWrongDiversionRatioMatrix, getElasticityMatrix, 
 	   spgetX, spgetP, spgetQty, spgetShares, spgetdQdX, spgetdQdP,
 	   spgetDiversionRatioMatrix, spgetElasticityMatrix, 
 	   getGroupX, getGroupP, getGroupQty, getGroupShares, getGroupdQdP, 
 	   getGroupDiversionRatioMatrix, getGroupElasticityMatrix,
 	   spgetGroupX, spgetGroupP, spgetGroupQty, spgetGroupShares, spgetGroupdQdP, 
-	   spgetGroupDiversionRatioMatrix, spgetGroupElasticityMatrix,
-	   make_ownership_matrix, FOC, getMC, getMARGIN, spgetMC, spgetMARGIN
+	   spgetGroupDiversionRatioMatrix, spgetWrongGroupDiversionRatioMatrix, spgetGroupElasticityMatrix,
+	   make_ownership_matrix, getMC, getMARGIN, FOC, MS_FOC, FPMS_FOC, 
+	   spgetMC, spgetMARGIN, spFOC, spMS_FOC, spFPMS_FOC
 	  
 
 end 

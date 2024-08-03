@@ -399,7 +399,24 @@ function getGroupDiversionRatioMatrix(AD::Vector{clogit_case_output}, INDMAT::Ma
 		end 
 	end
 	return DR
-end 
+end
+
+function getWrongGroupDiversionRatioMatrix(AD::Vector{clogit_case_output}, INDMAT::Matrix, PdivY::Bool=false)  
+	(G,J) = size(INDMAT)
+	dQdP = getdQdP(AD, PdivY)
+	dQjdPj = diag(dQdP)
+	DR = zeros(G, G)
+	@inbounds for a in 1:G
+		dQAdPA = sum(dQdP.*(INDMAT[a,:]*INDMAT[a,:]'))
+		for b in 1:G
+			if a!==b
+				dQBdPA = sum(dQdP.*(INDMAT[a,:]*INDMAT[b,:]'))
+				DR[a,b] = - dQBdPA / dQAdPA 
+			end
+		end 
+	end
+	return DR
+end  
 
 function getGroupElasticityMatrix(AD::Vector{clogit_case_output}, INDMAT::Matrix, PdivY::Bool=false)
 	(N,J) = size(INDMAT)
@@ -431,11 +448,15 @@ function spgetGroupX(AD::Vector{clogit_case_output}, J::Int64, INDMAT::SparseMat
 end
 
 function spgetGroupP(AD::Vector{clogit_case_output}, J::Int64, INDMAT::SparseMatrixCSC)
-	num = sum(sparsevec(ad.jid, ad.s .* ad.p, J) for ad in AD) 
-	denom = sum(sparsevec(ad.jid, ad.s, J) for ad in AD)
-	grp_q = INDMAT*denom
-	grp_rev = INDMAT*num	
-	return Vector(grp_rev ./ grp_q)
+	if length(AD[1].p) .== 0
+		return spgetGroupX(AD, J, INDMAT)
+	else
+		num = sum(sparsevec(ad.jid, ad.s .* ad.p, J) for ad in AD) 
+		denom = sum(sparsevec(ad.jid, ad.s, J) for ad in AD)
+		grp_q = INDMAT*denom
+		grp_rev = INDMAT*num	
+		return Vector(grp_rev ./ grp_q)
+	end
 end
 
 spgetGroupQty(AD::Vector{clogit_case_output}, J::Int64, INDMAT::SparseMatrixCSC) = Vector(INDMAT*spgetQty(AD, J))
@@ -467,6 +488,24 @@ function spgetGroupDiversionRatioMatrix(AD::Vector{clogit_case_output}, J::Int64
 	DR = zeros(G, G)
 	@inbounds for a in 1:G
 		dQAdPA = sum(dQjdPj[igidx] .* INDMAT[a, igidx])
+		for b in 1:G
+			if a!==b
+				dQBdPA = sum(dQdP[igidx, igidx].*(INDMAT[a,igidx]*INDMAT[b,igidx]'))
+				DR[a,b] = - dQBdPA / dQAdPA 
+			end
+		end 
+	end
+	return DR
+end 
+
+function spgetWrongGroupDiversionRatioMatrix(AD::Vector{clogit_case_output}, J::Int64, INDMAT::SparseMatrixCSC, PdivY::Bool=false)  
+	G = size(INDMAT, 1)
+	dQdP = spgetdQdP(AD, J, PdivY)
+	dQjdPj = diag(dQdP)
+	igidx = getInsideGoods(AD, J)
+	DR = zeros(G, G)
+	@inbounds for a in 1:G
+		dQAdPA = sum(dQdP[igidx, igidx].*(INDMAT[a,igidx]*INDMAT[a,igidx]'))
 		for b in 1:G
 			if a!==b
 				dQBdPA = sum(dQdP[igidx, igidx].*(INDMAT[a,igidx]*INDMAT[b,igidx]'))

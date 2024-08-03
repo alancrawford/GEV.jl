@@ -92,10 +92,6 @@ E_g = getGroupElasticityMatrix(AD , OWN.IND)
 # Get Marginal Costs
 MC = getMC(P,Q,dQdP,OWN.MAT) # MC = P .+ (OWN.MAT .* dQdP) \ Q
 
-#= OR can use shares
-	MC = getMC(P,s,dsdP,OWN.MAT) # MC = P .+ (OWN.MAT .* dsdP) \ s
-=#
-
 # Margins under different market structure
 INDMAT = Matrix(I(J))
 OWNMAT = Matrix(I(J))
@@ -112,21 +108,37 @@ FIRM_AS_SPN_LERNER = - 1 ./ FIRM_MARGIN # Note lerner won't match diag(E_g), agg
 [FIRM_AS_SPN_LERNER diag(E_g)] # LERNER >= Egg because of multiproduct effect 
 [FIRM_MARGIN -1 ./ diag(E_g)] # Same reason FIRM_MARGIN >= -1/Egg
 
+
 # ------------------ #
-# MERGER SIMULATION
+# FOC
 # ------------------ #
 
 # Check FOC first at pre-merger values
 df1 = deepcopy(df0);
-
 PARALLEL_FLAG = false; # Faciltates distribution of demand output calculations
 FOC0(x) = FOC(zeros(J), xstar, df1, clm, MC, OWN.MAT, x, :cost, pos_price, PARALLEL_FLAG)
 
 # Check
-@time FOC0(P0)
-isapprox.(FOC0(P0) , 0; atol=1e-6) 
+isapprox.(FOC0(P) , 0; atol=1e-6) 
 
 using NLsolve
+
+# Pre Merger FOC solver Checks
+P_init = P .+ randn(J)
+
+# Use FOC
+pre_res = nlsolve(FOC0, P_init)
+[pre_res.zero  P0]
+ 
+# Ben's method: MC + zeta(p) where zeta(p) = invL * (OMEGA .* Γ) * (P - MC) - invL * Q 
+FPMS_FOC0(x) = FPMS_FOC(zeros(J), xstar, df1, clm, MC, OWN.MAT, x, :cost, pos_price, PARALLEL_FLAG)
+
+pre_FPMSres = fixedpoint(FPMS_FOC0, P_init)
+[pre_res.zero  pre_FPMSres.zero P0]
+
+# ------------------ #
+# MERGER SIMULATION
+# ------------------ #
 
 # Merger of 3 & 4
 firm_df.post_owner = firm_df.owner 
@@ -135,14 +147,19 @@ POST_OWN= make_ownership_matrix(firm_df, :post_owner)
 
 # FOC under new merger under static Bertrand-nash competition
 PARALLEL_FLAG = false
-FOC1(x) = FOC(zeros(J), xstar, df1, clm, 
-			MC, POST_OWN.MAT, x, :cost, pos_price, PARALLEL_FLAG)
+FOC1(x) = FOC(zeros(J), xstar, df1, clm, MC, POST_OWN.MAT, x, :cost, pos_price, PARALLEL_FLAG)
 
 # Solve for post-merger prices (start from pre-merger)
-post_res = nlsolve(FOC1, P0)
+post_res = nlsolve(FOC1, P_init)
+
+# Ben's method: MC + zeta(p) where zeta(p) = invL * (OMEGA .* Γ) * (P - MC) - invL * Q 
+FPMS_FOC1(x) = FPMS_FOC(zeros(J), xstar, df1, clm, MC, POST_OWN.MAT, x, :cost, pos_price, PARALLEL_FLAG)
+
+post_FPMSres = fixedpoint(FPMS_FOC1, P_init)
+[post_res.zero  post_FPMSres.zero ]
 
 # Price Rise 
-P1 = post_res.zero
+P1 = post_FPMSres.zero
 PriceIncrease = (P1 .- P0 ) ./ P0
 
 # Consumer Welfare Change

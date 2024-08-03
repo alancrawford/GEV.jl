@@ -183,21 +183,16 @@ MARGIN_MPN = getMARGIN(P_ig, Q_ig, dQdP_ig, Matrix(I(NumProds)), Matrix(OMEGA_ig
 
 FIRM_MARGIN = getMARGIN(P_ig, Q_ig, dQdP_ig, Matrix(INDMAT_ig), Matrix(OMEGA_ig))
 
-# Now with Sparse
-OG_id = maximum(df.pid)
+# Sparse Margin Call 
 
-MARGIN_SPN = spgetMARGIN(P, Q, dQdP, sparse(I(OG_id)), sparse(I(OG_id)), inside_good_idx)[inside_good_idx]
+MARGIN_SPN = spgetMARGIN(P, Q, dQdP, sparse(I(J)), sparse(I(J)), inside_good_idx)
 [MARGIN_SPN -1 ./ diag(E_ig) isapprox.(MARGIN_SPN .- -1 ./ diag(E_ig), 0; atol=1e-6)] # Check
 
-MARGIN_MPN = spgetMARGIN(P, Q, dQdP, sparse(I(OG_id)), OWN.MAT, inside_good_idx)[inside_good_idx]
+MARGIN_MPN = spgetMARGIN(P, Q, dQdP, sparse(I(J)), OWN.MAT, inside_good_idx)
 [MARGIN_MPN  (P_ig .-MC_ig)./P_ig isapprox.(MARGIN_MPN .- (P_ig .-MC_ig)./P_ig, 0.; atol=1e-6)] # Check
 
-# Regular calls
-FIRM_MARGIN = spgetMARGIN(P, Q, dQdP, OWN.IND, OWN.MAT, inside_good_idx)
-
-
 # ------------------ #
-# MERGER SIMULATION
+# FOC
 # ------------------ #
 
 # Check FOC first at pre-merger values
@@ -207,16 +202,33 @@ NumInsideProds = length(inside_good_idx)
 PRE_OMEGA = Matrix(OWN.MAT[inside_good_idx,inside_good_idx])
 PARALLEL_FLAG = false; # Faciltates distribution of demand output calculations
 
-
-FOC0(x) = FOC(zeros(NumInsideProds), xstar, df1, clm, MC_ig, PRE_OMEGA, x, J, inside_good_idx,
+# First Order Condition - FOC
+FOC0(x) = spFOC(zeros(NumInsideProds), xstar, df1, clm, MC_ig, PRE_OMEGA, x, J, inside_good_idx,
 									:cost_div_Y, :cost, :invY, pos_PdivY, PARALLEL_FLAG)
-# Check
+
+# Check FOC condition
 P0 = deepcopy(P_ig)
-@time FOC0(P0)
 isapprox.(FOC0(P0) , 0; atol=1e-6) 
-CW0 = getCW(AggregateDemand(xstar, df0, cl0, pos_PdivY))
 
 using NLsolve
+
+# Pre Merger FOC solver Checks
+P_init = P0 .+ randn(7)
+
+# Use FOC
+pre_res = nlsolve(FOC0, P_init)
+[pre_res.zero  P0]
+ 
+# Ben's method: MC + zeta(p) where zeta(p) = invL * (OMEGA .* Γ) * (P - MC) - invL * Q 
+FPMS_FOC0(x) = spFPMS_FOC(zeros(NumInsideProds), xstar, df1, clm, MC_ig, PRE_OMEGA, x, J, inside_good_idx,
+									:cost_div_Y, :cost, :invY, pos_PdivY, PARALLEL_FLAG)
+
+pre_FPMSres = fixedpoint(FPMS_FOC0, P_init)
+[pre_res.zero  pre_FPMSres.zero P0]
+
+# ------------------ #
+# MERGER SIMULATION
+# ------------------ #
 
 # Merger of 3 & 4
 firm_df.post_owner = firm_df.owner 
@@ -226,17 +238,31 @@ POST_OMEGA = Matrix(POST_OWN.MAT[inside_good_idx,inside_good_idx])
 
 # FOC under new merger under static Bertrand-nash competition
 PARALLEL_FLAG = false
-FOC1(x) = FOC(zeros(NumInsideProds), xstar, df1, clm, MC_ig, POST_OMEGA, x, J, inside_good_idx,
+FOC1(x) = spFOC(zeros(NumInsideProds), xstar, df1, clm, MC_ig, POST_OMEGA, x, J, inside_good_idx,
 									 :cost_div_Y, :cost, :invY, pos_PdivY, PARALLEL_FLAG)
 
 # Solve for post-merger prices (start from pre-merger)
 post_res = nlsolve(FOC1, P_ig)
 
+# Ben's method: MC + zeta(p) where zeta(p) = invL * (OMEGA .* Γ) * (P - MC) - invL * Q 
+FPMS_FOC1(x) = spFPMS_FOC(zeros(NumInsideProds), xstar, df1, clm, MC_ig, POST_OMEGA, x, J, inside_good_idx,
+									:cost_div_Y, :cost, :invY, pos_PdivY, PARALLEL_FLAG)
+
+post_FPMSres = fixedpoint(FPMS_FOC1, P_ig)
+
+[post_res.zero post_FPMSres.zero]
+
 # Price Rise 
-P1 = post_res.zero
+P1 = post_FPMSres.zero
 PriceIncrease = (P1 .- P0 ) ./ P0
 
-# Consumer Welfare Change
-P1_CWinput = sparsevec([inside_good_idx..., J], [P1..., 0]);
-CW1 = getCW(AggregateDemand(xstar, df1, new_clogit_data(df1, clm, P1_CWinput, :cost_div_Y, :cost, :invY), pos_PdivY))
+# ------------------ #
+# CONSUMER WELFARE
+# ------------------ #
+
+P1_CWinput = sparsevec([inside_good_idx..., J], [P1..., 0])
+cl1 = new_clogit_data(df1, clm, P1_CWinput, :cost_div_Y, :cost, :invY)
+
+CW0 = getCW(AggregateDemand(xstar, df0, cl0, pos_PdivY))
+CW1 = getCW(AggregateDemand(xstar, df1, cl1, pos_PdivY))
 CW_CHANGE = CW1/CW0 - 1
