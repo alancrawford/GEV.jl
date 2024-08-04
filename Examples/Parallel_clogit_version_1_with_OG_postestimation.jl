@@ -106,7 +106,23 @@ P = spgetP(AD0, J)
 dQdP = spgetdQdP(AD0, J)
 dsdP = dQdP ./ length(AD)
 DR = spgetDiversionRatioMatrix(AD0, J)
-E = spgetElasticityMatrix(AD0, J)
+E = spgetElasticityMatrix(dQdP , Q, P) 
+
+# Call Inside Goods as dense Vector, Matrices with inside_good_idx as pid ref 
+inside_good_idx = getInsideGoods(AD0, J) 
+
+Q_ig = spgetQty(AD0, J, inside_good_idx)
+s_ig = spgetShares(AD0, J, inside_good_idx)
+X_ig = spgetX(AD0, J, inside_good_idx)
+P_ig = spgetP(AD0, J, inside_good_idx)
+dQdP_ig = spgetdQdP(AD0, J, inside_good_idx)
+dsdP_ig = dQdP_ig ./ length(AD)
+DR_ig = spgetDiversionRatioMatrix(AD0, J, inside_good_idx)
+E_ig = getElasticityMatrix(dQdP_ig, Q_ig, P_ig)
+
+# Putting OG subs on main diagonal
+DR_ig .+ I(length(inside_good_idx)).*( 1 .- sum(DR_ig, dims=2))
+
 
 # ----------- POST-ESTIMATION GROUPED DEMAND SIDE OUTPUTS ------------- #
 
@@ -123,28 +139,15 @@ X_g = spgetGroupX(AD0, J, OWN.IND)
 P_g = spgetGroupP(AD0, J, OWN.IND)
 Q_g = spgetGroupQty(AD0, J, OWN.IND)
 s_g = spgetGroupShares(AD0, J, OWN.IND)
-dQdP_g = spgetGroupdQdP(AD0, J, OWN.IND)
-dsdP_g = dQdP ./ length(AD0)
-DR_g = spgetGroupDiversionRatioMatrix( AD0 , J, OWN.IND)
-E_g = spgetGroupElasticityMatrix(AD0, J, OWN.IND)
 
-# Grouped level outputs - ONLY INSIDE GOODS
-# -------------------------------------
+dQdP_g = spgetGroupdQdP( xstar, df0, clm, J, Q_g, P_g,  :cost, :owner, pos_price, OWN.IND) 
+AdQdP_g = spgetApproxGroupdQdP(AD0, J, OWN.IND)
 
-# Call Inside Goods as dense Vector, Matrices with inside_good_idx as pid ref 
-inside_good_idx = getInsideGoods(AD0, J) 
+DR_g = spgetGroupDiversionRatioMatrix( xstar, df0, clm, J, Q_g, :cost, :owner, pos_price, OWN.IND) 
+ADR_g = spgetApproxGroupDiversionRatioMatrix( AD0 , J, OWN.IND)
 
-Q_ig = spgetQty(AD0, J, inside_good_idx)
-s_ig = spgetShares(AD0, J, inside_good_idx)
-X_ig = spgetX(AD0, J, inside_good_idx)
-P_ig = spgetP(AD0, J, inside_good_idx)
-dQdP_ig = spgetdQdP(AD0, J, inside_good_idx)
-dsdP_ig = dQdP_ig ./ length(AD)
-DR_ig = spgetDiversionRatioMatrix(AD0, J, inside_good_idx)
-E_ig = spgetElasticityMatrix(AD0, J, inside_good_idx)
-
-# Putting OG subs on main diagonal
-DR_ig .+ I(length(inside_good_idx)).*( 1 .- sum(DR_ig, dims=2))
+E_g = getElasticityMatrix(dQdP_g, Q_g, P_g )
+AE_g = getElasticityMatrix(AdQdP_g, Q_g, P_g )
 
 # ----------- POST-ESTIMATION SUPPLY-SIDE OUTPUTS ------------- #
 

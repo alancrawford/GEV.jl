@@ -7,6 +7,8 @@ using Distributed
 
 VV{T} = Vector{Vector{T}}
 ScalarOrVector{T} = Union{T,Vector{T}}
+VSpV{T} = Union{Vector{T},SparseVector}
+MatSpM{T} = Union{Matrix{T},SparseMatrixCSC}
 
 include("Types.jl")
 include("clogit.jl")
@@ -17,7 +19,10 @@ include("utils.jl")
 include("Elasticities_clogit.jl")
 include("Elasticities_nlogit.jl")
 include("AggregateDemand_clogit.jl")
+include("PostEstimation_clogit.jl")
+include("spPostEstimation_clogit.jl")
 include("SupplySide_BertrandNash_clogit.jl")
+include("spSupplySide_BertrandNash_clogit.jl")
 
 export clogit, clogit_model, clogit_param, clogit_case, 
 	   clogit_data, clogit_case_data, make_clogit_data, 
@@ -45,17 +50,15 @@ export clogit, clogit_model, clogit_param, clogit_case,
 	   elas_own_nlogit, grad_elas_own_nlogit,
 	   elas_within_nlogit, grad_elas_within_nlogit,
 	   elas_across_nlogit, grad_elas_across_nlogit,
-	   TS1, TS2, new_clogit_data, getCW, maxJ, getInsideGoods,
-	   DemandOutputs_clogit_case, AggregateDemand, 
-	   getX, getP, getQty, getShares, getdQdP,
-	   getDiversionRatioMatrix, getWrongDiversionRatioMatrix, getElasticityMatrix, 
-	   spgetX, spgetP, spgetQty, spgetShares, spgetdQdX, spgetdQdP,
-	   spgetDiversionRatioMatrix, spgetElasticityMatrix, 
-	   getGroupX, getGroupP, getGroupQty, getGroupShares, getGroupdQdP, 
-	   getGroupDiversionRatioMatrix, getGroupElasticityMatrix,
-	   spgetGroupX, spgetGroupP, spgetGroupQty, spgetGroupShares, spgetGroupdQdP, 
-	   spgetGroupDiversionRatioMatrix, spgetWrongGroupDiversionRatioMatrix, spgetGroupElasticityMatrix,
-	   make_ownership_matrix, getMC, getMARGIN, FOC, MS_FOC, FPMS_FOC, 
+	   TS1, TS2, 
+	   new_clogit_data, DemandOutputs_clogit_case, AggregateDemand, getCW, 
+	   getX, getP, getQty, getShares, getdQdX, getdQdP, getDiversionRatioMatrix, getElasticityMatrix, 
+	   maxJ, getInsideGoods,
+	   spgetX, spgetP, spgetQty, spgetShares, spgetdQdP, spgetDiversionRatioMatrix, spgetElasticityMatrix, 
+	   getGroupX, getGroupP, getGroupQty, getGroupShares, getApproxGroupdQdP, getApproxGroupDiversionRatioMatrix, getGroupdQdP, getGroupDiversionRatioMatrix, 
+	   spgetGroupX, spgetGroupP, spgetGroupQty, spgetGroupShares, spgetApproxGroupdQdP, spgetApproxGroupDiversionRatioMatrix, spgetGroupdQdP, spgetGroupDiversionRatioMatrix, 
+	   make_ownership_matrix, 
+	   getMC, getMARGIN, FOC, MS_FOC, FPMS_FOC, 
 	   spgetMC, spgetMARGIN, spFOC, spMS_FOC, spFPMS_FOC
 	  
 

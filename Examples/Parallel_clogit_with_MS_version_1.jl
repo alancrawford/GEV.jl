@@ -68,7 +68,7 @@ P = getX(AD)
 dQdP = getdQdP(AD)
 dsdP = dQdP ./ length(AD)
 DR = getDiversionRatioMatrix(AD)
-E = getElasticityMatrix(AD)
+E = getElasticityMatrix(dQdP, Q, P )
 
 # ----------- POST-ESTIMATION GROUPED DEMAND SIDE OUTPUTS ------------- #
 
@@ -82,10 +82,15 @@ OWN = make_ownership_matrix(firm_df, :owner)
 P_g = getGroupX(AD, OWN.IND)
 Q_g = getGroupQty(AD, OWN.IND)
 s_g = getGroupShares(AD, OWN.IND)
-dQdP_g = getGroupdQdP(AD, OWN.IND)
-dsdP_g = dQdP ./ length(AD)
-DR_g = getGroupDiversionRatioMatrix( AD , OWN.IND)
-E_g = getGroupElasticityMatrix(AD , OWN.IND)
+
+dQdP_g = getGroupdQdP( xstar, df0, clm, Q_g, P_g,  :cost, :owner, pos_price, OWN.IND) 
+AdQdP_g = getApproxGroupdQdP(AD, OWN.IND)
+
+DR_g = getGroupDiversionRatioMatrix( xstar, df0, clm, Q_g, :cost, :owner, pos_price, OWN.IND) 
+ADR_g = getApproxGroupDiversionRatioMatrix( AD , OWN.IND)
+
+AE_g = getElasticityMatrix(AdQdP_g , Q_g , P_g)
+E_g = getElasticityMatrix(dQdP_g , Q_g , P_g)
 
 # ----------- POST-ESTIMATION SUPPLY-SIDE OUTPUTS ------------- #
 
@@ -105,8 +110,8 @@ MARGIN_MPN = getMARGIN(P, Q, dQdP, INDMAT, OWN.MAT)
 # Check aggregate elasticity vs lerner at the age
 FIRM_MARGIN = getMARGIN(P, Q, dQdP, OWN.IND, OWN.MAT)
 FIRM_AS_SPN_LERNER = - 1 ./ FIRM_MARGIN # Note lerner won't match diag(E_g), aggregation across products in elasticities removes within product cross partials (they are not held fixed)
-[FIRM_AS_SPN_LERNER diag(E_g)] # LERNER >= Egg because of multiproduct effect 
-[FIRM_MARGIN -1 ./ diag(E_g)] # Same reason FIRM_MARGIN >= -1/Egg
+[FIRM_AS_SPN_LERNER diag(AE_g) diag(E_g)] # LERNER >= Egg because of multiproduct effect 
+[FIRM_MARGIN -1 ./ diag(AE_g) -1 ./ diag(E_g)] # Same reason FIRM_MARGIN >= -1/Egg
 
 
 # ------------------ #
