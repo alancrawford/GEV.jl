@@ -41,10 +41,21 @@ function spFOC(F, beta::Vector, df::DataFrame, clm::clogit_model, MC::Vector, OM
 	cl = new_clogit_data(df, clm, Pinput, Pvarname)
 
 	# Aggregate Demand
-	AD = AggregateDemand(beta, df, cl, Pvarpos, parallel)
+	AD = AggregateDemand(beta, df, cl, Pvarpos, false)
 
 	Q = spgetQty(AD, J, ig)
-	dQdP = spgetdQdP(AD, J, ig, false)
+
+	if !haskey(clm.opts, :PdivY)
+		clm.opts[:PdivY] = false 
+	end 
+	if parallel
+		sparse_dQdP = clm.opts[:PdivY] ? 
+			pmapreduce(x->spgetdQdP_PdivY(x, J), +, AD) : pmapreduce(x->spgetdQdP(x, J), +, AD)	
+	else 
+		sparse_dQdP = clm.opts[:PdivY] ? 
+			mapreduce(x->spgetdQdP_PdivY(x, J), +, AD) : mapreduce(x->spgetdQdP(x, J), +, AD)	
+	end 
+	dQdP = sparse_dQdP[ig,ig]
 
 	# FOC
 	F = Q .+ (OMEGA.*dQdP)*(P - MC)
@@ -61,10 +72,21 @@ function spFOC(F, beta::Vector, df::DataFrame, clm::clogit_model, MC::Vector, OM
 	cl = new_clogit_data(df, clm, Pinput, Pvarname)
 
 	# Aggregate Demand
-	AD = AggregateDemand(beta, df, cl, Pvarpos, PZvarpos, parallel)
+	AD = AggregateDemand(beta, df, cl, Pvarpos, PZvarpos, false)
 
 	Q = spgetQty(AD, J, ig)
-	dQdP = spgetdQdP(AD, J, ig, false)
+	
+	if !haskey(clm.opts, :PdivY)
+		clm.opts[:PdivY] = false 
+	end 
+	if parallel
+		sparse_dQdP = clm.opts[:PdivY] ? 
+			pmapreduce(x->spgetdQdP_PdivY(x, J), +, AD) : pmapreduce(x->spgetdQdP(x, J), +, AD)	
+	else 
+		sparse_dQdP = clm.opts[:PdivY] ? 
+			mapreduce(x->spgetdQdP_PdivY(x, J), +, AD) : mapreduce(x->spgetdQdP(x, J), +, AD)	
+	end 
+	dQdP = sparse_dQdP[ig,ig]
 
 	# FOC
 	F = Q .+ (OMEGA.*dQdP)*(P - MC)
@@ -81,10 +103,22 @@ function spFOC(F, beta::Vector, df::DataFrame, clm::clogit_model, MC::Vector, OM
 	cl = new_clogit_data(df, clm, Pinput, xvar, pvar, zvar )
 
 	# Aggregate Demand	# Aggregate Demand
-	AD = AggregateDemand(beta, df, cl, xvarpos, parallel)
+	AD = AggregateDemand(beta, df, cl, xvarpos, false)
+
 
 	Q = spgetQty(AD, J, ig)
-	dQdP = !haskey(clm.opts, :PdivY) ? spgetdQdP(AD, J, ig, false) : spgetdQdP(AD, J, ig, clm.opts[:PdivY])
+
+	if !haskey(clm.opts, :PdivY)
+		clm.opts[:PdivY] = false 
+	end 
+	if parallel
+		sparse_dQdP = clm.opts[:PdivY] ? 
+			pmapreduce(x->spgetdQdP_PdivY(x, J), +, AD) : pmapreduce(x->spgetdQdP(x, J), +, AD)	
+	else 
+		sparse_dQdP = clm.opts[:PdivY] ? 
+			mapreduce(x->spgetdQdP_PdivY(x, J), +, AD) : mapreduce(x->spgetdQdP(x, J), +, AD)	
+	end 
+	dQdP = sparse_dQdP[ig,ig]
 
 	# FOC
 	F = Q .+ (OMEGA.*dQdP)*(P - MC)
@@ -94,27 +128,56 @@ end
 
 # --------------- BEN SKRAINKA'S / MS CONTRACTION MAPPING WTIH SAME FIXED POINT AS FOC: SPARSE PRICE IN CS SETS ----------------- #
 
-function spgetMScomponents(AD::Vector{clogit_case_output}, J::Int64, inside_good_idx::Vector{Int64}, PdivY::Bool=false) 
-	
-	if PdivY 
-		N = length(AD)
-		dQdP_vec = [sparse( repeat(ad.jid, 1, ad.J)[:], repeat(ad.jid, 1, ad.J)'[:] , (ad.z .* ad.dsdx)[:], J, J) for ad in AD]
-		Λ_vec = [sparsevec(ad.jid, diag(dQdP_vec[i]).nzval ./ (1 .- ad.s) , J) for (i,ad) in enumerate(AD)]
-		Γ_vec = [ dQdP_vec[i] .* ( 1 .- I(J) )  .+ diagm( diag(dQdP_vec[i]) .- Λ_vec[i]) for (i,ad) in enumerate(AD)]
-	else 
-		N = length(AD)
-		dQdP_vec = [sparse( repeat(ad.jid, 1, ad.J)[:], repeat(ad.jid, 1, ad.J)'[:] , ad.dsdx[:], J, J) for ad in AD]
-		Λ_vec = [sparsevec(ad.jid, diag(dQdP_vec[i]).nzval ./ (1 .- ad.s) , J) for (i,ad) in enumerate(AD)]
-		Γ_vec = [ dQdP_vec[i] .* ( 1 .- I(J) )  .+ diagm( diag(dQdP_vec[i]) .- Λ_vec[i]) for (i,ad) in enumerate(AD)]
-	end 
+struct mscomp 
+	dQdP :: SparseMatrixCSC
+	Lambda :: SparseMatrixCSC
+	Gamma :: SparseMatrixCSC
+end
 
-	Δ = sum(dQdP_vec)[inside_good_idx, inside_good_idx]
-	Λ =  diagm(sum(Λ_vec))[inside_good_idx,inside_good_idx]
-	Γ = -sum(Γ_vec)[inside_good_idx, inside_good_idx]
+function spgetMScomponents_PdivY(ad::clogit_case_output, J::Int64)
+
+		JID = repeat(ad.jid, 1, ad.J)
+		dQdP = sparse( JID[:], JID'[:] , (ad.z .* ad.dsdx)[:], J, J) 
+		Λ = sparsevec(ad.jid, diag(dQdP).nzval ./ (1 .- ad.s) , J) 
+		Γ = dQdP .* ( 1 .- I(J) )  .+ diagm( diag(dQdP) .- Λ)
+
+		return mscomp(dQdP, Λ, Γ)
+end
+
+function spgetMScomponents(ad::clogit_case_output, J::Int64)
+
+		JID = repeat(ad.jid, 1, ad.J)
+		dQdP = sparse( JID[:], JID'[:] , ad.dsdx[:], J, J) 
+		Λ = sparsevec(ad.jid, diag(dQdP).nzval ./ (1 .- ad.s) , J) 
+		Γ = dQdP .* ( 1 .- I(J) )  .+ diagm( diag(dQdP) .- Λ)
+
+		return mscomp(dQdP, Λ, Γ)
+end
+
+function spgetMScomponents_PdivY(AD::Vector{clogit_case_output}, J::Int64, ig::Vector{Int64}, parallel::Bool=false) 
+
+	ms = parallel ? pmap(x->spgetMScomponents_PdivY(x, J), AD) : map(x->spgetMScomponents_PdivY(x, J), AD)
+
+	Δ = mapreduce(x->x.dQdP, +, ms)[ig, ig]
+	Λ = spdiagm(mapreduce(x->x.Lambda[ig], +, ms))
+	Γ = -mapreduce(x->x.Gamma, +, ms)[ig, ig]
 
 	return ( Delta = Δ, Lambda = Λ , Gamma = Γ)
 
 end
+
+function spgetMScomponents(AD::Vector{clogit_case_output}, J::Int64, ig::Vector{Int64}, parallel::Bool=false) 
+
+	ms = parallel ? pmap(x->spgetMScomponents(x, J), AD) : map(x->spgetMScomponents(x, J), AD)
+
+	Δ = mapreduce(x->x.dQdP, +, ms)[ig, ig]
+	Λ = spdiagm(mapreduce(x->x.Lambda[ig], +, ms))
+	Γ = -mapreduce(x->x.Gamma, +, ms)[ig, ig]
+
+	return ( Delta = Δ, Lambda = Λ , Gamma = Γ)
+
+end
+
 
 
 # No interactions
@@ -130,7 +193,12 @@ function spFPMS_FOC(F, beta::Vector, df::DataFrame, clm::clogit_model, MC::Vecto
 	AD = AggregateDemand(beta, df, cl, Pvarpos, parallel)
 
 	Q = spgetQty(AD, J, ig)
-	MS = spgetMScomponents(AD, J, ig, false) 
+
+	if !haskey(clm.opts, :PdivY)
+		clm.opts[:PdivY] = false 
+	end 
+	
+	MS = clm.opts[:PdivY] ? spgetMScomponents_PdivY(AD, J, ig, parallel) : spgetMScomponents(AD, J, ig, parallel) 
 
 	invL =  diagm(1 ./ diag(MS.Lambda))
 	G =  OMEGA .* MS.Gamma
@@ -153,7 +221,12 @@ function spFPMS_FOC(F, beta::Vector, df::DataFrame, clm::clogit_model, MC::Vecto
 	AD = AggregateDemand(beta, df, cl, Pvarpos, PZvarpos, parallel)
 
 	Q = spgetQty(AD, J, ig)
-	MS = spgetMScomponents(AD, J, ig, false) 
+
+	if !haskey(clm.opts, :PdivY)
+		clm.opts[:PdivY] = false 
+	end 
+	
+	MS = clm.opts[:PdivY] ? spgetMScomponents_PdivY(AD, J, ig, parallel) : spgetMScomponents(AD, J, ig, parallel) 
 
 	invL =  diagm(1 ./ diag(MS.Lambda))
 	G =  OMEGA .* MS.Gamma
@@ -177,8 +250,12 @@ function spFPMS_FOC(F, beta::Vector, df::DataFrame, clm::clogit_model, MC::Vecto
 	AD = AggregateDemand(beta, df, cl, xvarpos, parallel)
 
 	Q = spgetQty(AD, J, ig)
-	S = spgetShares(AD, J, ig)
-	MS = !haskey(clm.opts, :PdivY) ? spgetMScomponents(AD, J, ig, false) : spgetMScomponents(AD, J, ig, clm.opts[:PdivY])
+
+	if !haskey(clm.opts, :PdivY)
+		clm.opts[:PdivY] = false 
+	end 
+	
+	MS = clm.opts[:PdivY] ? spgetMScomponents_PdivY(AD, J, ig, parallel) : spgetMScomponents(AD, J, ig, parallel) 
 
 	invL =  diagm(1 ./ diag(MS.Lambda))
 	G =  OMEGA .* MS.Gamma

@@ -69,6 +69,16 @@ function spgetdQdP(AD::Vector{clogit_case_output}, J::Int64, inside_good_idx::Ve
 	return Matrix(dQdP)	
 end
 
+function spgetdQdP_PdivY(ad::clogit_case_output, J::Int64)
+    JID = repeat(ad.jid, 1, ad.J)
+    return sparse( JID[:], JID'[:] , vec(ad.z .* ad.dsdx), J, J)
+end
+
+function spgetdQdP(ad::clogit_case_output, J::Int64)
+    JID = repeat(ad.jid, 1, ad.J)
+    return sparse( JID[:], JID'[:] , ad.dsdx[:], J, J)
+end
+
 # --------------------------------------------------------- #
 
 function spgetDiversionRatioMatrix(AD::Vector{clogit_case_output}, J::Int64, PdivY::Bool=false)

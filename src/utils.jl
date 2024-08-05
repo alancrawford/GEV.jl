@@ -1,4 +1,8 @@
-
+function pmapreduce(mapfun, redfun, iters...)
+       @distributed redfun for arg in collect(zip(iters...))
+              mapfun(arg...)
+       end
+end 
 
 function categorical!(df::DataFrame, x::Symbol)
 	df[!, x] = categorical(df.x)

@@ -187,10 +187,10 @@ FIRM_MARGIN = getMARGIN(P_ig, Q_ig, dQdP_ig, Matrix(INDMAT_ig), Matrix(OMEGA_ig)
 
 # Sparse Margin Call 
 
-MARGIN_SPN = spgetMARGIN(P, Q, dQdP, sparse(I(J)), sparse(I(J)), inside_good_idx)
+MARGIN_SPN = spgetMARGIN(P, Q, dQdP, sparse(I(J)), sparse(I(J)), inside_good_idx)[inside_good_idx]
 [MARGIN_SPN -1 ./ diag(E_ig) isapprox.(MARGIN_SPN .- -1 ./ diag(E_ig), 0; atol=1e-6)] # Check
 
-MARGIN_MPN = spgetMARGIN(P, Q, dQdP, sparse(I(J)), OWN.MAT, inside_good_idx)
+MARGIN_MPN = spgetMARGIN(P, Q, dQdP, sparse(I(J)), OWN.MAT, inside_good_idx)[inside_good_idx]
 [MARGIN_MPN  (P_ig .-MC_ig)./P_ig isapprox.(MARGIN_MPN .- (P_ig .-MC_ig)./P_ig, 0.; atol=1e-6)] # Check
 
 # ------------------ #
