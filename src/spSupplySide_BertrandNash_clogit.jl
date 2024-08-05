@@ -26,7 +26,7 @@ function spgetMARGIN(P::SparseVector, Q::SparseVector, dQdP::SparseMatrixCSC, IM
 	PROFIT = -FIRM_QTY*(Δ\ Vector(Q[inside_good_idx])) 
 	REVENUE =  FIRM_QTY*Vector(P[inside_good_idx])
 	MARGIN = PROFIT ./ REVENUE
-	return MARGIN[inside_good_idx]
+	return MARGIN
 end 
 
 # --------------- FOC: Sparse Price Inputs ----------------- #
