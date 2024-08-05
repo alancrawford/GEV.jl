@@ -32,7 +32,7 @@ end
 # --------------- FOC: Sparse Price Inputs ----------------- #
 
 # No interactions
-function spFOC(F, beta::Vector, df::DataFrame, clm::clogit_model, MC::Vector, OMEGA::Matrix, P, J::Int64, ig::Vector,
+function spFOC(F, beta::Vector, df::DataFrame, clm::clogit_model, MC::Vector, OMEGA::MatSpM, P, J::Int64, ig::Vector,
 				 Pvarname::Symbol, Pvarpos::Int64, parallel::Bool=false)
 
 	Pinput = sparsevec([ig..., J], [P..., 0])
@@ -52,7 +52,7 @@ function spFOC(F, beta::Vector, df::DataFrame, clm::clogit_model, MC::Vector, OM
 end
 
 # Mask to allow interactions
-function spFOC(F, beta::Vector, df::DataFrame, clm::clogit_model, MC::Vector, OMEGA::Matrix, P, J::Int64, ig::Vector,
+function spFOC(F, beta::Vector, df::DataFrame, clm::clogit_model, MC::Vector, OMEGA::MatSpM, P, J::Int64, ig::Vector,
 				 Pvarname::Symbol, Pvarpos::Int64, PZvarpos::ScalarOrVector{Int64}, parallel::Bool=false)
 
 	Pinput = sparsevec([ig..., J], [P..., 0])
@@ -72,7 +72,7 @@ function spFOC(F, beta::Vector, df::DataFrame, clm::clogit_model, MC::Vector, OM
 end
 
 # Masks to allow for P/Y FOC with sparse price vector
-function spFOC(F, beta::Vector, df::DataFrame, clm::clogit_model, MC::Vector, OMEGA::Matrix, P, J::Int64, ig::Vector,
+function spFOC(F, beta::Vector, df::DataFrame, clm::clogit_model, MC::Vector, OMEGA::MatSpM, P, J::Int64, ig::Vector,
 				  xvar::Symbol, pvar::Symbol, zvar::Symbol, xvarpos::ScalarOrVector{Int64}, parallel::Bool=false)
 
 	Pinput = sparsevec([ig..., J], [P..., 0])
@@ -118,7 +118,7 @@ end
 
 
 # No interactions
-function spFPMS_FOC(F, beta::Vector, df::DataFrame, clm::clogit_model, MC::Vector, OMEGA::Matrix, P,  J::Int64, ig::Vector,
+function spFPMS_FOC(F, beta::Vector, df::DataFrame, clm::clogit_model, MC::Vector, OMEGA::MatSpM, P,  J::Int64, ig::Vector,
 				 Pvarname::Symbol, Pvarpos::Int64, parallel::Bool=false)
 
 	Pinput = sparsevec([ig..., J], [P..., 0])
@@ -141,7 +141,7 @@ function spFPMS_FOC(F, beta::Vector, df::DataFrame, clm::clogit_model, MC::Vecto
 end
 
 # Mask to allow interactions
-function spFPMS_FOC(F, beta::Vector, df::DataFrame, clm::clogit_model, MC::Vector, OMEGA::Matrix, P, J::Int64, ig::Vector,
+function spFPMS_FOC(F, beta::Vector, df::DataFrame, clm::clogit_model, MC::Vector, OMEGA::MatSpM, P, J::Int64, ig::Vector,
 				 Pvarname::Symbol, Pvarpos::Int64, PZvarpos::ScalarOrVector{Int64}, parallel::Bool=false)
 
 	Pinput = sparsevec([ig..., J], [P..., 0])
@@ -165,7 +165,7 @@ end
 
 
 # Masks to allow for P/Y FOC with sparse price vector
-function spFPMS_FOC(F, beta::Vector, df::DataFrame, clm::clogit_model, MC::Vector, OMEGA::Matrix, P, J::Int64, ig::Vector,
+function spFPMS_FOC(F, beta::Vector, df::DataFrame, clm::clogit_model, MC::Vector, OMEGA::MatSpM, P, J::Int64, ig::Vector,
 				  xvar::Symbol, pvar::Symbol, zvar::Symbol, xvarpos::ScalarOrVector{Int64}, parallel::Bool=false)
 
 	Pinput = sparsevec([ig..., J], [P..., 0])
