@@ -201,7 +201,7 @@ function spFPMS_FOC(F, beta::Vector, df::DataFrame, clm::clogit_model, MC::Vecto
 	
 	MS = clm.opts[:PdivY] ? spgetMScomponents_PdivY(AD, J, ig, parallel) : spgetMScomponents(AD, J, ig, parallel) 
 
-	invL =  spdiagm(1 ./ MS.Lambda)
+	invL =  spdiagm(1 ./ diag(MS.Lambda))
 	G =  OMEGA .* MS.Gamma
 
 	# FOC
@@ -229,7 +229,7 @@ function spFPMS_FOC(F, beta::Vector, df::DataFrame, clm::clogit_model, MC::Vecto
 	
 	MS = clm.opts[:PdivY] ? spgetMScomponents_PdivY(AD, J, ig, parallel) : spgetMScomponents(AD, J, ig, parallel) 
 
-	invL =  spdiagm(1 ./ MS.Lambda)
+	invL =  spdiagm(1 ./ diag(MS.Lambda))
 	G =  OMEGA .* MS.Gamma
 
 	# FOC
@@ -258,7 +258,7 @@ function spFPMS_FOC(F, beta::Vector, df::DataFrame, clm::clogit_model, MC::Vecto
 	
 	MS = clm.opts[:PdivY] ? spgetMScomponents_PdivY(AD, J, ig, parallel) : spgetMScomponents(AD, J, ig, parallel) 
 
-	invL =  spdiagm(1 ./ MS.Lambda)
+	invL =  spdiagm(1 ./ diag(MS.Lambda))
 	G =  OMEGA .* MS.Gamma
 
 	# FOC
