@@ -26,7 +26,7 @@ function spgetMARGIN(P::SparseVector, Q::SparseVector, dQdP::SparseMatrixCSC, IM
 	PROFIT = -FIRM_QTY*(Δ\ Vector(Q[inside_good_idx])) 
 	REVENUE =  FIRM_QTY*Vector(P[inside_good_idx])
 	MARGIN = PROFIT ./ REVENUE
-	return Vector(MARGIN[inside_good_idx])
+	return MARGIN
 end 
 
 # --------------- FOC: Sparse Price Inputs ----------------- #
@@ -138,7 +138,7 @@ function spgetMScomponents_PdivY(ad::clogit_case_output, J::Int64)
 
 	JID = repeat(ad.jid, 1, ad.J)
 	dQdP = sparse( JID[:], JID'[:] , (ad.z .* ad.dsdx)[:], J, J) 
-	Λ = sparsevec(ad.jid, (diag(dQdPv[ad.jid,ad.jid]).nzval ./ ad.s) , J)
+	Λ = sparsevec(ad.jid, diag(dQdPv[ad.jid,ad.jid]).nzval ./ ( 1 .- ad.s) , J)
 	Γ = dQdP .* ( 1 .- I(J) )  .+ spdiagm( diag(dQdP) .- Λ)
 
 	return mscomp(dQdP, Λ, Γ)
@@ -148,7 +148,7 @@ function spgetMScomponents(ad::clogit_case_output, J::Int64)
 
 	JID = repeat(ad.jid, 1, ad.J)
 	dQdP = sparse( JID[:], JID'[:] , ad.dsdx[:], J, J) 
-	Λ = sparsevec(ad.jid, (diag(dQdPv[ad.jid,ad.jid]).nzval ./ ad.s) , J)
+	Λ = sparsevec(ad.jid, diag(dQdP[ad.jid,ad.jid]).nzval ./ ( 1 .- ad.s) , J)
 	Γ = dQdP .* ( 1 .- I(J) )  .+ spdiagm( diag(dQdP) .- Λ)
 
 	return mscomp(dQdP, Λ, Γ)
