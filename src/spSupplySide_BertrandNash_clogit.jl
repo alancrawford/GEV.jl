@@ -26,7 +26,7 @@ function spgetMARGIN(P::SparseVector, Q::SparseVector, dQdP::SparseMatrixCSC, IM
 	PROFIT = -FIRM_QTY*(Δ\ Vector(Q[inside_good_idx])) 
 	REVENUE =  FIRM_QTY*Vector(P[inside_good_idx])
 	MARGIN = PROFIT ./ REVENUE
-	return MARGIN
+	return Vector(MARGIN[inside_good_idx])
 end 
 
 # --------------- FOC: Sparse Price Inputs ----------------- #
@@ -41,7 +41,7 @@ function spFOC(F, beta::Vector, df::DataFrame, clm::clogit_model, MC::Vector, OM
 	cl = new_clogit_data(df, clm, Pinput, Pvarname)
 
 	# Aggregate Demand
-	AD = AggregateDemand(beta, df, cl, Pvarpos, false)
+	AD = AggregateDemand(beta, df, cl, Pvarpos, parallel)
 
 	Q = spgetQty(AD, J, ig)
 
@@ -72,7 +72,7 @@ function spFOC(F, beta::Vector, df::DataFrame, clm::clogit_model, MC::Vector, OM
 	cl = new_clogit_data(df, clm, Pinput, Pvarname)
 
 	# Aggregate Demand
-	AD = AggregateDemand(beta, df, cl, Pvarpos, PZvarpos, false)
+	AD = AggregateDemand(beta, df, cl, Pvarpos, PZvarpos, parallel)
 
 	Q = spgetQty(AD, J, ig)
 	
@@ -103,7 +103,7 @@ function spFOC(F, beta::Vector, df::DataFrame, clm::clogit_model, MC::Vector, OM
 	cl = new_clogit_data(df, clm, Pinput, xvar, pvar, zvar )
 
 	# Aggregate Demand	# Aggregate Demand
-	AD = AggregateDemand(beta, df, cl, xvarpos, false)
+	AD = AggregateDemand(beta, df, cl, xvarpos, parallel)
 
 
 	Q = spgetQty(AD, J, ig)
@@ -136,22 +136,23 @@ end
 
 function spgetMScomponents_PdivY(ad::clogit_case_output, J::Int64)
 
-		JID = repeat(ad.jid, 1, ad.J)
-		dQdP = sparse( JID[:], JID'[:] , (ad.z .* ad.dsdx)[:], J, J) 
-		Λ = sparsevec(ad.jid, diag(dQdP).nzval ./ (1 .- ad.s) , J) 
-		Γ = dQdP .* ( 1 .- I(J) )  .+ diagm( diag(dQdP) .- Λ)
+	JID = repeat(ad.jid, 1, ad.J)
+	dQdP = sparse( JID[:], JID'[:] , (ad.z .* ad.dsdx)[:], J, J) 
+	Λ = sparsevec(ad.jid, (diag(dQdPv[ad.jid,ad.jid]).nzval ./ ad.s) , J)
+	Γ = dQdP .* ( 1 .- I(J) )  .+ spdiagm( diag(dQdP) .- Λ)
 
-		return mscomp(dQdP, Λ, Γ)
+	return mscomp(dQdP, Λ, Γ)
 end
 
 function spgetMScomponents(ad::clogit_case_output, J::Int64)
 
-		JID = repeat(ad.jid, 1, ad.J)
-		dQdP = sparse( JID[:], JID'[:] , ad.dsdx[:], J, J) 
-		Λ = sparsevec(ad.jid, diag(dQdP).nzval ./ (1 .- ad.s) , J) 
-		Γ = dQdP .* ( 1 .- I(J) )  .+ diagm( diag(dQdP) .- Λ)
+	JID = repeat(ad.jid, 1, ad.J)
+	dQdP = sparse( JID[:], JID'[:] , ad.dsdx[:], J, J) 
+	Λ = sparsevec(ad.jid, (diag(dQdPv[ad.jid,ad.jid]).nzval ./ ad.s) , J)
+	Γ = dQdP .* ( 1 .- I(J) )  .+ spdiagm( diag(dQdP) .- Λ)
 
-		return mscomp(dQdP, Λ, Γ)
+	return mscomp(dQdP, Λ, Γ)
+	
 end
 
 function spgetMScomponents_PdivY(AD::Vector{clogit_case_output}, J::Int64, ig::Vector{Int64}, parallel::Bool=false) 
@@ -200,7 +201,7 @@ function spFPMS_FOC(F, beta::Vector, df::DataFrame, clm::clogit_model, MC::Vecto
 	
 	MS = clm.opts[:PdivY] ? spgetMScomponents_PdivY(AD, J, ig, parallel) : spgetMScomponents(AD, J, ig, parallel) 
 
-	invL =  diagm(1 ./ diag(MS.Lambda))
+	invL =  spdiagm(1 ./ MS.Lambda)
 	G =  OMEGA .* MS.Gamma
 
 	# FOC
@@ -228,7 +229,7 @@ function spFPMS_FOC(F, beta::Vector, df::DataFrame, clm::clogit_model, MC::Vecto
 	
 	MS = clm.opts[:PdivY] ? spgetMScomponents_PdivY(AD, J, ig, parallel) : spgetMScomponents(AD, J, ig, parallel) 
 
-	invL =  diagm(1 ./ diag(MS.Lambda))
+	invL =  spdiagm(1 ./ MS.Lambda)
 	G =  OMEGA .* MS.Gamma
 
 	# FOC
@@ -257,7 +258,7 @@ function spFPMS_FOC(F, beta::Vector, df::DataFrame, clm::clogit_model, MC::Vecto
 	
 	MS = clm.opts[:PdivY] ? spgetMScomponents_PdivY(AD, J, ig, parallel) : spgetMScomponents(AD, J, ig, parallel) 
 
-	invL =  diagm(1 ./ diag(MS.Lambda))
+	invL =  spdiagm(1 ./ MS.Lambda)
 	G =  OMEGA .* MS.Gamma
 
 	# FOC
