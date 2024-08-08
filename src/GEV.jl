@@ -50,13 +50,21 @@ export clogit, clogit_model, clogit_param, clogit_case,
 	   elas_own_nlogit, grad_elas_own_nlogit,
 	   elas_within_nlogit, grad_elas_within_nlogit,
 	   elas_across_nlogit, grad_elas_across_nlogit,
-	   TS1, TS2, 
+	   TS1, TS2, maxJ, getInsideGoods,
 	   new_clogit_data, DemandOutputs_clogit_case, AggregateDemand, getCW, 
-	   getX, getP, getQty, getShares, getdQdX, getdQdP, getDiversionRatioMatrix, getElasticityMatrix, 
-	   maxJ, getInsideGoods,
-	   spgetX, spgetP, spgetQty, spgetShares, spgetdQdP, spgetDiversionRatioMatrix, spgetElasticityMatrix, 
-	   getGroupX, getGroupP, getGroupQty, getGroupShares, getApproxGroupdQdP, getApproxGroupDiversionRatioMatrix, getGroupdQdP, getGroupDiversionRatioMatrix, 
-	   spgetGroupX, spgetGroupP, spgetGroupQty, spgetGroupShares, spgetApproxGroupdQdP, spgetApproxGroupDiversionRatioMatrix, spgetGroupdQdP, spgetGroupDiversionRatioMatrix, 
+	   
+	   getX, getP, getQty, getShares, getdQdX, getdQdP, getDiversionRatioMatrix, 
+	   getPriceDiversionRatioMatrix, getElasticityMatrix, 
+	   
+	   spgetX, spgetP, spgetQty, spgetShares, spgetdQdX, spgetdQdP, spgetDiversionRatioMatrix, 
+	   spgetPriceDiversionRatioMatrix, spgetElasticityMatrix, 
+	   
+	   getGroupX, getGroupP, getGroupQty, getGroupShares, getGroupdQdX, getGroupdQdP, 
+	   getGroupDiversionRatioMatrix, getGroupPriceDiversionRatioMatrix,
+	   
+	   spgetGroupX, spgetGroupP, spgetGroupQty, spgetGroupShares, spgetGroupdQdX, spgetGroupdQdP, 
+	   spgetGroupDiversionRatioMatrix, spgetGroupPriceDiversionRatioMatrix, 
+	   
 	   make_ownership_matrix, 
 	   getMC, getMARGIN, FOC, MS_FOC, FPMS_FOC, 
 	   spgetMC, spgetMARGIN, spFOC, spMS_FOC, spFPMS_FOC

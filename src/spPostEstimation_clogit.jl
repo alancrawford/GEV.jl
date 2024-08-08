@@ -81,8 +81,19 @@ end
 
 # --------------------------------------------------------- #
 
-function spgetDiversionRatioMatrix(AD::Vector{clogit_case_output}, J::Int64, PdivY::Bool=false)
-	dQdP = spgetdQdP(AD, J)
+function spgetDiversionRatioMatrix(AD::Vector{clogit_case_output}, J::Int64)
+	dQdX = spgetdQdX(AD, J)
+	DR = spzeros(J,J)
+	rows = rowvals(dQdX)
+	for j in unique(rows)
+		dQdXj = dQdX[j,:]
+		DR[j, dQdXj.nzind] = (- dQdXj / dQdX[j,j]).nzval
+	end
+	return DR
+end 
+
+function spgetPriceDiversionRatioMatrix(AD::Vector{clogit_case_output}, J::Int64, PdivY::Bool=false)
+	dQdP = spgetdQdP(AD, J, PdivY)
 	DR = spzeros(J,J)
 	rows = rowvals(dQdP)
 	for j in unique(rows)
@@ -90,10 +101,15 @@ function spgetDiversionRatioMatrix(AD::Vector{clogit_case_output}, J::Int64, Pdi
 		DR[j, dQdpj.nzind] = (- dQdpj / dQdP[j,j]).nzval
 	end
 	return DR
-end 
+end
 
-function spgetDiversionRatioMatrix(AD::Vector{clogit_case_output}, J::Int64, inside_good_idx::Vector{Int64}, PdivY::Bool=false)
-	dQdP = Matrix(spgetdQdP(AD, J, inside_good_idx))
+function spgetDiversionRatioMatrix(AD::Vector{clogit_case_output}, J::Int64, inside_good_idx::Vector{Int64})
+	dQdX = Matrix(spgetdQdX(AD, J, inside_good_idx))
+	return -dQdX ./ diag(dQdX)
+end  
+
+function spgetPriceDiversionRatioMatrix(AD::Vector{clogit_case_output}, J::Int64, inside_good_idx::Vector{Int64}, PdivY::Bool=false)
+	dQdP = Matrix(spgetdQdP(AD, J, inside_good_idx, PdivY))
 	return -dQdP ./ diag(dQdP)
 end 
 
@@ -129,7 +145,18 @@ spgetGroupQty(AD::Vector{clogit_case_output}, J::Int64, INDMAT::MatSpM) = Vector
 
 spgetGroupShares(AD::Vector{clogit_case_output}, J::Int64, INDMAT::MatSpM) = Vector(INDMAT*spgetShares(AD, J))
 
-function spgetApproxGroupdQdP(AD::Vector{clogit_case_output}, J::Int64, INDMAT::MatSpM, PdivY::Bool=false)  
+function spgetGroupdQdX(AD::Vector{clogit_case_output}, J::Int64, INDMAT::MatSpM)  
+	G = size(INDMAT, 1)
+	sp_dQdX = spgetdQdX(AD, J)
+	igidx = getInsideGoods(AD, J)
+	dQdX = zeros(G, G)
+	for a in 1:G, b in 1:G
+		dQdX[a,b] = sum(sp_dQdX[igidx, igidx].*(INDMAT[a,igidx]*INDMAT[b,igidx]'))
+	end
+	return dQdX
+end 
+
+function spgetGroupdQdP(AD::Vector{clogit_case_output}, J::Int64, INDMAT::MatSpM, PdivY::Bool=false)  
 	G = size(INDMAT, 1)
 	sp_dQdP = spgetdQdP(AD, J, PdivY)
 	igidx = getInsideGoods(AD, J)
@@ -140,7 +167,24 @@ function spgetApproxGroupdQdP(AD::Vector{clogit_case_output}, J::Int64, INDMAT::
 	return dQdP
 end 
 
-function spgetApproxGroupDiversionRatioMatrix(AD::Vector{clogit_case_output}, J::Int64, INDMAT::MatSpM, PdivY::Bool=false)  
+function spgetGroupDiversionRatioMatrix(AD::Vector{clogit_case_output}, J::Int64, INDMAT::MatSpM)  
+	G = size(INDMAT, 1)
+	dQdX= spgetdQdX(AD, J)
+	igidx = getInsideGoods(AD, J)
+	DR = zeros(G, G)
+	@inbounds for a in 1:G
+		dQAdXA = sum(dQdX[igidx, igidx].*(INDMAT[a,igidx]*INDMAT[a,igidx]'))
+		for b in 1:G
+			if a!==b
+				dQBdXA = sum(dQdX[igidx, igidx].*(INDMAT[a,igidx]*INDMAT[b,igidx]'))
+				DR[a,b] = - dQBdXA / dQAdXA 
+			end
+		end 
+	end
+	return DR
+end 
+
+function spgetGroupPriceDiversionRatioMatrix(AD::Vector{clogit_case_output}, J::Int64, INDMAT::MatSpM, PdivY::Bool=false)  
 	G = size(INDMAT, 1)
 	dQdP = spgetdQdP(AD, J, PdivY)
 	igidx = getInsideGoods(AD, J)
@@ -157,12 +201,14 @@ function spgetApproxGroupDiversionRatioMatrix(AD::Vector{clogit_case_output}, J:
 	return DR
 end 
 
-function spgetGroupdQdP( beta::Vector, df::DataFrame, clm::clogit_model, J::Int64, Q0::Vector, P0::Vector,
+# SIMULATION METHODS
+
+function spgetGroupdQdX( beta::Vector, df::DataFrame, clm::clogit_model, J::Int64, Q0::Vector, X0::Vector,
 		xvar::Symbol, groupvar::Symbol, xvarpos::Int64, INDMAT::MatSpM, parallel::Bool=false)
 
 	# Baseline Volume
 	G = length(Q0)
-	dQdP = zeros(G, G)
+	dQdX = zeros(G, G)
 	grouplist = levels(df[:,groupvar])
 
 	for (i,b) in enumerate(grouplist)
@@ -181,23 +227,23 @@ function spgetGroupdQdP( beta::Vector, df::DataFrame, clm::clogit_model, J::Int6
 		# New Qty
 		Q1 = spgetGroupQty(AD_TEMP, J, INDMAT)
 		ΔQ = Q1 - Q0
-		ΔP = 0.01*P0
+		ΔX = 0.01*X0
 
 
 		# Diversion Ratio for increase in b
-		dQdP[i, :] = ΔQ ./ ΔP
+		dQdX[i, :] = ΔQ ./ ΔX
 
 	end
 	
-	return dQdP
+	return dQdX
 end
 
-function spgetGroupdQdP( beta::Vector, df::DataFrame, clm::clogit_model, J::Int64, Q0::Vector, P0::Vector,
+function spgetGroupdQdX( beta::Vector, df::DataFrame, clm::clogit_model, J::Int64, Q0::Vector, X0::Vector,
 		xvar::Symbol, groupvar::Symbol, xvarpos::Int64, xzvarpos::ScalarOrVector, INDMAT::MatSpM, parallel::Bool=false)
 
 	# Baseline Volume
 	G = length(Q0)
-	dQdP = zeros(G, G)
+	dQdX = zeros(G, G)
 	grouplist = levels(df[:,groupvar])
 
 	for (i,b) in enumerate(grouplist)
@@ -216,14 +262,14 @@ function spgetGroupdQdP( beta::Vector, df::DataFrame, clm::clogit_model, J::Int6
 		# New Qty
 		Q1 = spgetGroupQty(AD_TEMP, J, INDMAT)
 		ΔQ = Q1 - Q0
-		ΔP = 0.01*P0
+		ΔX = 0.01*X0
 
 		# Diversion Ratio for increase in b
-		dQdP[i, :] = ΔQ ./ ΔP
+		dQdX[i, :] = ΔQ ./ ΔX
 
 	end
 	
-	return dQdP
+	return dQdX
 end
 
 

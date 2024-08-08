@@ -20,7 +20,12 @@ getdQdX(AD::Vector{clogit_case_output}) = sum(ad.dsdx for ad in AD)
 
 getdQdP(AD::Vector{clogit_case_output}, PdivY::Bool=false) = PdivY ? sum(ad.dsdx .* ad.z for ad in AD) : sum(ad.dsdx for ad in AD)
 
-function getDiversionRatioMatrix(AD::Vector{clogit_case_output}, PdivY::Bool=false)
+function getDiversionRatioMatrix(AD::Vector{clogit_case_output})
+	dQdX = getdQdX(AD)
+	return -dQdX ./ diag(dQdX)
+end 
+
+function getPriceDiversionRatioMatrix(AD::Vector{clogit_case_output}, PdivY::Bool=false)
 	dQdP = getdQdP(AD, PdivY)
 	return -dQdP ./ diag(dQdP)
 end 
@@ -49,7 +54,18 @@ getGroupQty(AD::Vector{clogit_case_output}, INDMAT::MatSpM, M::Real=1) = INDMAT*
 
 getGroupShares(AD::Vector{clogit_case_output}, INDMAT::MatSpM) = INDMAT*getShares(AD)
 
-function getApproxGroupdQdP(AD::Vector{clogit_case_output}, INDMAT::MatSpM, PdivY::Bool=false)  
+function getGroupdQdX(AD::Vector{clogit_case_output}, INDMAT::MatSpM)  
+	(G,J) = size(INDMAT)
+	dQdX = getdQdX(AD)
+	dQjdXj = diag(dQdX)
+	grp_dQdX = zeros(G, G)
+	@inbounds for a in 1:G, b in 1:G
+		grp_dQdX[a,b] = sum(dQdX.*(INDMAT[a,:]*INDMAT[b,:]'))
+	end
+	return grp_dQdX
+end 
+
+function getGroupdQdP(AD::Vector{clogit_case_output}, INDMAT::MatSpM, PdivY::Bool=false)  
 	(G,J) = size(INDMAT)
 	dQdP = getdQdP(AD, PdivY)
 	dQjdPj = diag(dQdP)
@@ -60,7 +76,25 @@ function getApproxGroupdQdP(AD::Vector{clogit_case_output}, INDMAT::MatSpM, Pdiv
 	return grp_dQdP
 end 
 
-function getApproxGroupDiversionRatioMatrix(AD::Vector{clogit_case_output}, INDMAT::MatSpM, PdivY::Bool=false)  
+function getGroupDiversionRatioMatrix(AD::Vector{clogit_case_output}, INDMAT::MatSpM)  
+	(G,J) = size(INDMAT)
+	dQdX = getdQdX(AD)
+	dQjdXj = diag(dQdX)
+	DR = zeros(G, G)
+	@inbounds for a in 1:G
+		dQAdXA = sum(dQdX.*(INDMAT[a,:]*INDMAT[a,:]'))
+		for b in 1:G
+			if a!==b
+				dQBdXA = sum(dQdX.*(INDMAT[a,:]*INDMAT[b,:]'))
+				DR[a,b] = - dQBdXA / dQAdXA 
+			end
+		end 
+	end
+	return DR
+end  
+
+
+function getGroupPriceDiversionRatioMatrix(AD::Vector{clogit_case_output}, INDMAT::MatSpM, PdivY::Bool=false)  
 	(G,J) = size(INDMAT)
 	dQdP = getdQdP(AD, PdivY)
 	dQjdPj = diag(dQdP)

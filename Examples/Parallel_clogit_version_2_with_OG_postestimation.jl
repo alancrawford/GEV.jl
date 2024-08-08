@@ -114,7 +114,7 @@ X = spgetX(AD0, J)
 P = spgetP(AD0, J)
 dQdP = spgetdQdP(AD0, J,  clm.opts[:PdivY])
 dsdP = dQdP ./ length(AD)
-DR = spgetDiversionRatioMatrix(AD0, J,  clm.opts[:PdivY])
+DR = spgetPriceDiversionRatioMatrix(AD0, J,  clm.opts[:PdivY])
 E = spgetElasticityMatrix(dQdP , Q, P)
 
 # Call Inside Goods as dense Vector, Matrices with inside_good_idx as pid ref 
@@ -126,7 +126,7 @@ X_ig = spgetX(AD0, J, inside_good_idx)
 P_ig = spgetP(AD0, J, inside_good_idx)
 dQdP_ig = spgetdQdP(AD0, J, inside_good_idx, clm.opts[:PdivY])
 dsdP_ig = dQdP_ig ./ length(AD)
-DR_ig = spgetDiversionRatioMatrix(AD0, J, inside_good_idx,  clm.opts[:PdivY])
+DR_ig = spgetPriceDiversionRatioMatrix(AD0, J, inside_good_idx,  clm.opts[:PdivY])
 E_ig = getElasticityMatrix(dQdP_ig , Q_ig , P_ig)
 
 # Putting OG subs on main diagonal
@@ -148,11 +148,11 @@ P_g = spgetGroupP(AD0, J, OWN.IND)
 Q_g = spgetGroupQty(AD0, J, OWN.IND)
 s_g = spgetGroupShares(AD0, J, OWN.IND)
 
-dQdP_g = spgetGroupdQdP( xstar, df0, clm, J, Q_g, P_g,  :cost_div_Y, :owner, pos_PdivY, OWN.IND, clm.opts[:PdivY]) 
-AdQdP_g = spgetApproxGroupdQdP(AD0, J, OWN.IND, clm.opts[:PdivY])
+dQdP_g = spgetGroupdQdX( xstar, df0, clm, J, Q_g, P_g,  :cost_div_Y, :owner, pos_PdivY, OWN.IND, clm.opts[:PdivY]) 
+AdQdP_g = spgetGroupdQdP(AD0, J, OWN.IND, clm.opts[:PdivY])
 
 DR_g = spgetGroupDiversionRatioMatrix( xstar, df0, clm, J, Q_g, :cost_div_Y, :owner, pos_PdivY, OWN.IND, clm.opts[:PdivY]) 
-ADR_g = spgetApproxGroupDiversionRatioMatrix( AD0 , J, OWN.IND, clm.opts[:PdivY])
+ADR_g = spgetGroupPriceDiversionRatioMatrix( AD0 , J, OWN.IND, clm.opts[:PdivY])
 
 E_g = getElasticityMatrix(dQdP_g, Q_g, P_g )
 AE_g = getElasticityMatrix(AdQdP_g, Q_g, P_g )
@@ -187,10 +187,10 @@ FIRM_MARGIN = getMARGIN(P_ig, Q_ig, dQdP_ig, Matrix(INDMAT_ig), Matrix(OMEGA_ig)
 
 # Sparse Margin Call 
 
-MARGIN_SPN = spgetMARGIN(P, Q, dQdP, sparse(I(J)), sparse(I(J)), inside_good_idx)[inside_good_idx]
+MARGIN_SPN = spgetMARGIN(P, Q, dQdP, sparse(I(J)), sparse(I(J)), inside_good_idx)
 [MARGIN_SPN -1 ./ diag(E_ig) isapprox.(MARGIN_SPN .- -1 ./ diag(E_ig), 0; atol=1e-6)] # Check
 
-MARGIN_MPN = spgetMARGIN(P, Q, dQdP, sparse(I(J)), OWN.MAT, inside_good_idx)[inside_good_idx]
+MARGIN_MPN = spgetMARGIN(P, Q, dQdP, sparse(I(J)), OWN.MAT, inside_good_idx)
 [MARGIN_MPN  (P_ig .-MC_ig)./P_ig isapprox.(MARGIN_MPN .- (P_ig .-MC_ig)./P_ig, 0.; atol=1e-6)] # Check
 
 # ------------------ #
@@ -200,7 +200,7 @@ MARGIN_MPN = spgetMARGIN(P, Q, dQdP, sparse(I(J)), OWN.MAT, inside_good_idx)[ins
 # Check FOC first at pre-merger values
 df1 = deepcopy(df0);
 NumInsideProds = length(inside_good_idx)
-PRE_OMEGA = Matrix(OWN.MAT[inside_good_idx,inside_good_idx])
+PRE_OMEGA = OWN.MAT[inside_good_idx,inside_good_idx]
 PARALLEL_FLAG = false; # Faciltates distribution of demand output calculations
 
 # First Order Condition - FOC
@@ -224,7 +224,7 @@ pre_res = nlsolve(FOC0, P_init)
 FPMS_FOC0(x) = spFPMS_FOC(zeros(NumInsideProds), xstar, df1, clm, MC_ig, PRE_OMEGA, x, J, inside_good_idx,
 									:cost_div_Y, :cost, :invY, pos_PdivY, PARALLEL_FLAG)
 
-pre_FPMSres = fixedpoint(FPMS_FOC0, P_init)
+pre_FPMSres = fixedpoint(FPMS_FOC0, P_init; show_trace=true, ftol=1e-2)
 [pre_res.zero  pre_FPMSres.zero P0]
 
 # ------------------ #
